@@ -42,9 +42,12 @@ export function AuthProvider({ children }) {
       });
       return { success: true };
     } catch (err) {
+      // err.response.data is the raw ApiResponse envelope from the backend
+      const body = err.response?.data;
       const message =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
+        body?.message ||          // ApiResponse.message (preferred — human-readable)
+        body?.error ||            // ApiResponse.error (error code fallback)
+        err.message ||            // Axios/network error
         'Login failed. Please check your credentials.';
       return { success: false, message };
     } finally {
@@ -73,9 +76,12 @@ export function AuthProvider({ children }) {
       });
       return { success: true };
     } catch (err) {
+      // err.response.data is the raw ApiResponse envelope from the backend
+      const body = err.response?.data;
       const message =
-        err.response?.data?.message ||
-        err.response?.data?.error ||
+        body?.message ||          // ApiResponse.message (preferred — human-readable)
+        body?.error ||            // ApiResponse.error (error code fallback)
+        err.message ||            // Axios/network error
         'Registration failed. Please try again.';
       return { success: false, message };
     } finally {

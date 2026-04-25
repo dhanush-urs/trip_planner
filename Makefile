@@ -4,7 +4,9 @@
 # =============================================================================
 
 .PHONY: help up down logs ps rebuild reset health train verify \
-        up-infra up-backend up-frontend run-auth run-ml run-frontend
+        up-infra up-backend up-frontend run-auth run-ml run-frontend \
+        logs-auth logs-gateway logs-trip logs-hotel logs-route \
+        logs-budget logs-split logs-ml logs-frontend logs-discovery
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 CYAN  := \033[0;36m
@@ -55,7 +57,23 @@ up:
 	@echo ""
 	docker compose up --build -d
 	@echo ""
-	@bash scripts/print-urls.sh
+	@echo "  $(GREEN)✓ All containers started in the background.$(RESET)"
+	@echo ""
+	@echo "  $(YELLOW)Spring Boot services need 2-3 minutes to fully start.$(RESET)"
+	@echo "  Run $(CYAN)make health$(RESET) after ~2 minutes to verify all services are UP."
+	@echo ""
+	@echo "  $(CYAN)Access Points (available once healthy):$(RESET)"
+	@echo "  Frontend App     →  http://localhost:3000"
+	@echo "  API Gateway      →  http://localhost:8080"
+	@echo "  Eureka Dashboard →  http://localhost:8761"
+	@echo "  ML Service Docs  →  http://localhost:8087/docs"
+	@echo ""
+	@echo "  $(CYAN)Useful Commands:$(RESET)"
+	@echo "  make health   — check all service health endpoints"
+	@echo "  make logs     — tail logs from all services"
+	@echo "  make ps       — show container status"
+	@echo "  make down     — stop the stack"
+	@echo ""
 
 ## Stop and remove containers (keeps volumes)
 down:
@@ -90,16 +108,55 @@ rebuild:
 	docker compose down
 	docker compose up --build -d
 	@echo ""
-	@bash scripts/print-urls.sh
+	@echo "  $(GREEN)✓ Rebuild complete. Services starting in background.$(RESET)"
+	@echo "  Run $(CYAN)make health$(RESET) after ~2 minutes to verify all services are UP."
+	@echo ""
 
 ## Tail logs from all services
 logs:
 	@echo "$(CYAN)  Tailing logs (Ctrl+C to stop)...$(RESET)"
 	docker compose logs -f --tail=50
 
-## Tail logs from a specific service: make logs-auth
-logs-%:
-	docker compose logs -f --tail=100 $*
+## Tail logs from a specific service by container suffix:
+##   make logs-auth     → docker compose logs auth-service
+##   make logs-gateway  → docker compose logs api-gateway
+##   make logs-trip     → docker compose logs trip-service
+##   make logs-hotel    → docker compose logs hotel-service
+##   make logs-route    → docker compose logs route-service
+##   make logs-budget   → docker compose logs budget-service
+##   make logs-split    → docker compose logs split-service
+##   make logs-ml       → docker compose logs ml-service
+##   make logs-frontend → docker compose logs frontend
+##   make logs-discovery→ docker compose logs discovery-server
+logs-auth:
+	docker compose logs -f --tail=200 auth-service
+
+logs-gateway:
+	docker compose logs -f --tail=200 api-gateway
+
+logs-trip:
+	docker compose logs -f --tail=200 trip-service
+
+logs-hotel:
+	docker compose logs -f --tail=200 hotel-service
+
+logs-route:
+	docker compose logs -f --tail=200 route-service
+
+logs-budget:
+	docker compose logs -f --tail=200 budget-service
+
+logs-split:
+	docker compose logs -f --tail=200 split-service
+
+logs-ml:
+	docker compose logs -f --tail=200 ml-service
+
+logs-frontend:
+	docker compose logs -f --tail=200 frontend
+
+logs-discovery:
+	docker compose logs -f --tail=200 discovery-server
 
 ## Show container status
 ps:

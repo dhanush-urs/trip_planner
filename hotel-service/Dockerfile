@@ -5,12 +5,12 @@ RUN mvn dependency:go-offline -B
 COPY src ./src
 RUN mvn clean package -DskipTests -B
 
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 WORKDIR /app
-RUN addgroup -S tripforge && adduser -S tripforge -G tripforge
+RUN addgroup --system tripforge && adduser --system --ingroup tripforge tripforge
 USER tripforge
 COPY --from=builder /app/target/hotel-service-1.0.0.jar app.jar
 EXPOSE 8083
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget -qO- http://localhost:8083/actuator/health || exit 1
+  CMD curl -sf http://localhost:8083/actuator/health || exit 1
 ENTRYPOINT ["java", "-jar", "-Djava.security.egd=file:/dev/./urandom", "app.jar"]

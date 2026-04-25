@@ -93,12 +93,19 @@ public class GlobalExceptionHandler {
 
     /**
      * Catch-all for unexpected errors.
+     * Logs the full stack trace and returns a structured error response.
+     * The message field contains the actual exception message so the frontend
+     * can display something meaningful instead of a generic fallback.
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
-        log.error("Unexpected error: {}", ex.getMessage(), ex);
+        log.error("Unexpected error: {} — {}", ex.getClass().getSimpleName(), ex.getMessage(), ex);
+        // Surface the real message so the frontend can show it
+        String userMessage = (ex.getMessage() != null && !ex.getMessage().isBlank())
+                ? ex.getMessage()
+                : "An unexpected error occurred";
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("An unexpected error occurred", "INTERNAL_ERROR"));
+                .body(ApiResponse.error(userMessage, "INTERNAL_ERROR"));
     }
 }

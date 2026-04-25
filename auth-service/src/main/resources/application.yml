@@ -19,7 +19,7 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: ${JPA_DDL_AUTO:validate}
+      ddl-auto: update
     show-sql: ${JPA_SHOW_SQL:false}
     properties:
       hibernate:
@@ -32,8 +32,8 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
-    schemas: auth
-    baseline-on-migrate: true
+    baseline-on-migrate: false
+    init-sqls: CREATE SCHEMA IF NOT EXISTS auth
 
 # Eureka client
 eureka:

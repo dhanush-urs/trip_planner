@@ -1,32 +1,29 @@
-version: "3.9"
-
 # =============================================================================
 # TripForge — Full Stack Docker Compose
 #
 # Usage:
 #   cp .env.example .env
-#   # Train ML models first (one-time):
-#   cd ml-service && python3 training/generate_hotel_training_data.py
-#   cd ml-service && python3 training/train_hotel_ranker.py
-#   cd ml-service && python3 training/generate_trip_style_data.py
-#   cd ml-service && python3 training/train_trip_classifier.py && cd ..
-#   # Start everything:
-#   docker-compose up --build
+#   make up
+#   # Wait 2-3 minutes, then:
+#   make health
 #
-# Startup order (enforced by depends_on + healthchecks):
-#   1. postgres
-#   2. discovery-server
-#   3. api-gateway, auth-service
-#   4. trip-service, hotel-service, route-service, budget-service, split-service
-#   5. ml-service
-#   6. frontend
+# Startup order:
+#   1. postgres          (infrastructure — healthchecked)
+#   2. discovery-server  (infrastructure — healthchecked)
+#   3. All app services start in parallel once postgres + discovery are healthy
+#   4. ml-service        (independent — no DB dependency)
+#   5. frontend          (starts immediately — static Nginx, no app dependency)
+#
+# App services (auth, trip, hotel, route, budget, split, gateway) all depend
+# only on postgres + discovery-server being healthy. They do NOT depend on
+# each other — Spring Boot + Eureka handles service discovery at runtime.
 #
 # Database schemas (all in one postgres container):
-#   auth     → auth-service
-#   trip     → trip-service
-#   hotel    → hotel-service
-#   route    → route-service
-#   budget   → budget-service
+#   auth         → auth-service
+#   trip         → trip-service
+#   hotel        → hotel-service
+#   route        → route-service
+#   budget       → budget-service
 #   split_schema → split-service
 # =============================================================================
 
@@ -81,11 +78,11 @@ services:
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q UP || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8761/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
       timeout: 10s
-      start_period: 60s
-      retries: 5
+      start_period: 90s
+      retries: 12
 
   # ── API Gateway ─────────────────────────────────────────────────────────────
   api-gateway:
@@ -101,16 +98,18 @@ services:
       EUREKA_URL:   http://discovery-server:8761/eureka/
       JWT_SECRET:   ${JWT_SECRET:-TripForge-Super-Secret-Key-2024-Must-Be-At-Least-256-Bits-Long!!}
     depends_on:
+      postgres:
+        condition: service_healthy
       discovery-server:
         condition: service_healthy
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
       timeout: 10s
       start_period: 90s
-      retries: 5
+      retries: 12
 
   # ── Auth Service ────────────────────────────────────────────────────────────
   auth-service:
@@ -131,7 +130,7 @@ services:
       EUREKA_URL:         http://discovery-server:8761/eureka/
       JWT_SECRET:         ${JWT_SECRET:-TripForge-Super-Secret-Key-2024-Must-Be-At-Least-256-Bits-Long!!}
       JWT_EXPIRATION_MS:  ${JWT_EXPIRATION_MS:-86400000}
-      JPA_DDL_AUTO:       validate
+      JPA_DDL_AUTO:       update
     depends_on:
       postgres:
         condition: service_healthy
@@ -140,11 +139,11 @@ services:
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8081/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
       timeout: 10s
-      start_period: 120s
-      retries: 5
+      start_period: 90s
+      retries: 12
 
   # ── Trip Service ────────────────────────────────────────────────────────────
   trip-service:
@@ -163,22 +162,20 @@ services:
       DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
       DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:   http://discovery-server:8761/eureka/
-      JPA_DDL_AUTO: validate
+      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy
       discovery-server:
         condition: service_healthy
-      auth-service:
-        condition: service_healthy
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8082/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
       timeout: 10s
-      start_period: 120s
-      retries: 5
+      start_period: 90s
+      retries: 12
 
   # ── Hotel Service ───────────────────────────────────────────────────────────
   hotel-service:
@@ -198,7 +195,7 @@ services:
       DB_PASSWORD:      ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:       http://discovery-server:8761/eureka/
       ML_SERVICE_URL:   http://ml-service:8087
-      JPA_DDL_AUTO:     validate
+      JPA_DDL_AUTO:     update
     depends_on:
       postgres:
         condition: service_healthy
@@ -207,11 +204,11 @@ services:
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q UP || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8083/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
       timeout: 10s
-      start_period: 120s
-      retries: 5
+      start_period: 90s
+      retries: 12
 
   # ── Route Service ───────────────────────────────────────────────────────────
   route-service:
@@ -230,7 +227,7 @@ services:
       DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
       DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:   http://discovery-server:8761/eureka/
-      JPA_DDL_AUTO: validate
+      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy
@@ -239,11 +236,11 @@ services:
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q UP || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8084/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
       timeout: 10s
-      start_period: 120s
-      retries: 5
+      start_period: 90s
+      retries: 12
 
   # ── Budget Service ──────────────────────────────────────────────────────────
   budget-service:
@@ -262,7 +259,7 @@ services:
       DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
       DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:   http://discovery-server:8761/eureka/
-      JPA_DDL_AUTO: validate
+      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy
@@ -271,11 +268,11 @@ services:
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health | grep -q UP || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8085/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
       timeout: 10s
-      start_period: 120s
-      retries: 5
+      start_period: 90s
+      retries: 12
 
   # ── Split Service ───────────────────────────────────────────────────────────
   split-service:
@@ -294,7 +291,7 @@ services:
       DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
       DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:   http://discovery-server:8761/eureka/
-      JPA_DDL_AUTO: validate
+      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy
@@ -303,15 +300,15 @@ services:
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health | grep -q UP || exit 1"]
-      interval: 20s
+      test: ["CMD-SHELL", "curl -sf http://localhost:8086/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
       timeout: 10s
-      start_period: 120s
-      retries: 5
+      start_period: 90s
+      retries: 12
 
   # ── ML Service (FastAPI) ────────────────────────────────────────────────────
   # NOTE: saved_models/*.pkl must exist before building.
-  # Run training scripts locally first (see scripts/train-ml-models.sh)
+  # Run: make train   (one-time, before first docker compose up --build)
   ml-service:
     build:
       context: ./ml-service
@@ -328,10 +325,10 @@ services:
       - tripforge-net
     healthcheck:
       test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8087/health')\" || exit 1"]
-      interval: 30s
+      interval: 15s
       timeout: 10s
       start_period: 30s
-      retries: 3
+      retries: 12
 
   # ── Frontend (React → Nginx) ────────────────────────────────────────────────
   frontend:
@@ -344,13 +341,11 @@ services:
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"
-    depends_on:
-      api-gateway:
-        condition: service_healthy
     networks:
       - tripforge-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80 || exit 1"]
-      interval: 30s
+      test: ["CMD-SHELL", "curl -sf http://localhost:80 || exit 1"]
+      interval: 15s
       timeout: 5s
-      retries: 3
+      start_period: 30s
+      retries: 12
