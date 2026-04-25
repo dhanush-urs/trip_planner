@@ -1,0 +1,51 @@
+destination,name,category,avg_visit_hours,ticket_cost,priority_score,distance_cluster,suitable_for_interests
+Goa,Baga Beach,beach,3.0,0,9.5,A,nature,beaches,nightlife
+Goa,Calangute Beach,beach,3.0,0,9.3,A,nature,beaches
+Goa,Anjuna Flea Market,shopping,2.5,0,8.5,B,shopping,food
+Goa,Basilica of Bom Jesus,temple,1.5,0,8.8,A,temples
+Goa,Fort Aguada,nature,2.0,30,8.2,A,nature,adventure
+Goa,Dudhsagar Falls,nature,4.0,400,9.0,C,nature,adventure
+Goa,Tito's Lane Nightlife,nightlife,3.0,500,8.0,A,nightlife
+Goa,Spice Plantation Tour,nature,3.0,600,8.3,C,nature,food
+Goa,Chapora Fort,nature,1.5,0,7.8,B,nature,adventure
+Goa,Panjim City Walk,food,2.0,0,7.5,A,food,shopping
+Mysore,Mysore Palace,temple,2.5,70,9.8,A,temples,nature
+Mysore,Chamundi Hills,temple,2.0,0,9.2,B,temples,nature
+Mysore,Brindavan Gardens,nature,2.5,50,8.9,B,nature
+Mysore,Mysore Zoo,nature,3.0,100,8.5,A,nature
+Mysore,Devaraja Market,shopping,1.5,0,8.0,A,shopping,food
+Mysore,St. Philomena's Church,temple,1.0,0,7.8,A,temples
+Mysore,Karanji Lake,nature,2.0,30,7.5,A,nature
+Mysore,Mysore Sand Sculpture Museum,nature,1.5,100,7.2,A,nature
+Mysore,Srirangapatna,temple,3.0,50,8.7,C,temples,nature
+Mysore,Jaganmohan Palace,temple,1.5,50,8.3,A,temples
+Bangalore,Lalbagh Botanical Garden,nature,2.5,20,9.0,A,nature
+Bangalore,Cubbon Park,nature,2.0,0,8.8,A,nature
+Bangalore,Bangalore Palace,temple,2.0,230,8.5,A,temples
+Bangalore,ISKCON Temple Bangalore,temple,1.5,0,8.7,B,temples
+Bangalore,Commercial Street,shopping,3.0,0,8.3,A,shopping
+Bangalore,UB City Mall,shopping,3.0,0,7.8,A,shopping,nightlife
+Bangalore,Vidhana Soudha,nature,1.0,0,8.0,A,nature
+Bangalore,Wonderla Amusement Park,adventure,6.0,900,9.2,C,adventure
+Bangalore,Nandi Hills,nature,4.0,0,9.5,C,nature,adventure
+Bangalore,Bannerghatta National Park,nature,4.0,400,9.3,C,nature,adventure
+Ooty,Ooty Lake,nature,2.0,30,9.0,A,nature
+Ooty,Botanical Gardens Ooty,nature,2.5,30,9.2,A,nature
+Ooty,Doddabetta Peak,nature,2.0,0,9.5,B,nature,adventure
+Ooty,Nilgiri Mountain Railway,nature,3.0,250,9.8,A,nature,adventure
+Ooty,Rose Garden Ooty,nature,1.5,30,8.5,A,nature
+Ooty,Pykara Lake,nature,3.0,0,8.8,C,nature,adventure
+Ooty,Mudumalai National Park,nature,5.0,350,9.3,C,nature,adventure
+Ooty,Ooty Tea Factory,food,1.5,50,8.0,B,food,nature
+Ooty,Tribal Research Centre,temple,1.5,0,7.5,A,temples,nature
+Ooty,Emerald Lake,nature,2.5,0,8.3,C,nature
+Manali,Rohtang Pass,adventure,5.0,550,9.8,C,nature,adventure
+Manali,Solang Valley,adventure,4.0,300,9.5,B,adventure,nature
+Manali,Hadimba Temple,temple,1.5,0,9.0,A,temples,nature
+Manali,Old Manali,food,2.5,0,8.5,A,food,shopping,nightlife
+Manali,Beas River Rafting,adventure,3.0,800,9.2,A,adventure
+Manali,Manali Sanctuary,nature,3.0,0,8.8,B,nature,adventure
+Manali,Naggar Castle,temple,2.0,100,8.3,B,temples,nature
+Manali,Vashisht Hot Springs,nature,1.5,0,8.0,A,nature
+Manali,Great Himalayan National Park,nature,6.0,200,9.6,C,nature,adventure
+Manali,Mall Road Manali,shopping,2.0,0,7.8,A,shopping,food

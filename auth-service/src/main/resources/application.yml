@@ -1,0 +1,67 @@
+server:
+  port: ${SERVER_PORT:8081}
+
+spring:
+  application:
+    name: auth-service
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:tripforge}
+    username: ${DB_USERNAME:tripforge_user}
+    password: ${DB_PASSWORD:tripforge_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    show-sql: ${JPA_SHOW_SQL:false}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: auth
+    open-in-view: false
+
+  # Flyway for DB migrations
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: auth
+    baseline-on-migrate: true
+
+# Eureka client
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# JWT configuration — must match api-gateway exactly
+jwt:
+  secret: ${JWT_SECRET:TripForge-Super-Secret-Key-2024-Must-Be-At-Least-256-Bits-Long!!}
+  expiration-ms: ${JWT_EXPIRATION_MS:86400000}  # 24 hours
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.tripforge.auth: DEBUG
+    org.springframework.security: WARN
+    org.hibernate.SQL: ${LOG_SQL:WARN}

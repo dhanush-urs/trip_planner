@@ -1,0 +1,356 @@
+version: "3.9"
+
+# =============================================================================
+# TripForge — Full Stack Docker Compose
+#
+# Usage:
+#   cp .env.example .env
+#   # Train ML models first (one-time):
+#   cd ml-service && python3 training/generate_hotel_training_data.py
+#   cd ml-service && python3 training/train_hotel_ranker.py
+#   cd ml-service && python3 training/generate_trip_style_data.py
+#   cd ml-service && python3 training/train_trip_classifier.py && cd ..
+#   # Start everything:
+#   docker-compose up --build
+#
+# Startup order (enforced by depends_on + healthchecks):
+#   1. postgres
+#   2. discovery-server
+#   3. api-gateway, auth-service
+#   4. trip-service, hotel-service, route-service, budget-service, split-service
+#   5. ml-service
+#   6. frontend
+#
+# Database schemas (all in one postgres container):
+#   auth     → auth-service
+#   trip     → trip-service
+#   hotel    → hotel-service
+#   route    → route-service
+#   budget   → budget-service
+#   split_schema → split-service
+# =============================================================================
+
+networks:
+  tripforge-net:
+    driver: bridge
+    name: tripforge-net
+
+volumes:
+  postgres-data:
+    name: tripforge-postgres-data
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: tripforge-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       ${DB_NAME:-tripforge}
+      POSTGRES_USER:     ${DB_USERNAME:-tripforge_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-tripforge_pass}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-tripforge_user} -d ${DB_NAME:-tripforge}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── Discovery Server (Eureka) ───────────────────────────────────────────────
+  discovery-server:
+    build:
+      context: ./discovery-server
+      dockerfile: Dockerfile
+    container_name: tripforge-discovery
+    restart: unless-stopped
+    ports:
+      - "${DISCOVERY_PORT:-8761}:8761"
+    environment:
+      SERVER_PORT:      8761
+      EUREKA_HOSTNAME:  discovery-server
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 10s
+      start_period: 60s
+      retries: 5
+
+  # ── API Gateway ─────────────────────────────────────────────────────────────
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: tripforge-gateway
+    restart: unless-stopped
+    ports:
+      - "${GATEWAY_PORT:-8080}:8080"
+    environment:
+      SERVER_PORT:  8080
+      EUREKA_URL:   http://discovery-server:8761/eureka/
+      JWT_SECRET:   ${JWT_SECRET:-TripForge-Super-Secret-Key-2024-Must-Be-At-Least-256-Bits-Long!!}
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 10s
+      start_period: 90s
+      retries: 5
+
+  # ── Auth Service ────────────────────────────────────────────────────────────
+  auth-service:
+    build:
+      context: ./auth-service
+      dockerfile: Dockerfile
+    container_name: tripforge-auth
+    restart: unless-stopped
+    ports:
+      - "${AUTH_PORT:-8081}:8081"
+    environment:
+      SERVER_PORT:        8081
+      DB_HOST:            postgres
+      DB_PORT:            5432
+      DB_NAME:            ${DB_NAME:-tripforge}
+      DB_USERNAME:        ${DB_USERNAME:-tripforge_user}
+      DB_PASSWORD:        ${DB_PASSWORD:-tripforge_pass}
+      EUREKA_URL:         http://discovery-server:8761/eureka/
+      JWT_SECRET:         ${JWT_SECRET:-TripForge-Super-Secret-Key-2024-Must-Be-At-Least-256-Bits-Long!!}
+      JWT_EXPIRATION_MS:  ${JWT_EXPIRATION_MS:-86400000}
+      JPA_DDL_AUTO:       validate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+  # ── Trip Service ────────────────────────────────────────────────────────────
+  trip-service:
+    build:
+      context: ./trip-service
+      dockerfile: Dockerfile
+    container_name: tripforge-trip
+    restart: unless-stopped
+    ports:
+      - "${TRIP_PORT:-8082}:8082"
+    environment:
+      SERVER_PORT:  8082
+      DB_HOST:      postgres
+      DB_PORT:      5432
+      DB_NAME:      ${DB_NAME:-tripforge}
+      DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
+      DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
+      EUREKA_URL:   http://discovery-server:8761/eureka/
+      JPA_DDL_AUTO: validate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+  # ── Hotel Service ───────────────────────────────────────────────────────────
+  hotel-service:
+    build:
+      context: ./hotel-service
+      dockerfile: Dockerfile
+    container_name: tripforge-hotel
+    restart: unless-stopped
+    ports:
+      - "${HOTEL_PORT:-8083}:8083"
+    environment:
+      SERVER_PORT:      8083
+      DB_HOST:          postgres
+      DB_PORT:          5432
+      DB_NAME:          ${DB_NAME:-tripforge}
+      DB_USERNAME:      ${DB_USERNAME:-tripforge_user}
+      DB_PASSWORD:      ${DB_PASSWORD:-tripforge_pass}
+      EUREKA_URL:       http://discovery-server:8761/eureka/
+      ML_SERVICE_URL:   http://ml-service:8087
+      JPA_DDL_AUTO:     validate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8083/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+  # ── Route Service ───────────────────────────────────────────────────────────
+  route-service:
+    build:
+      context: ./route-service
+      dockerfile: Dockerfile
+    container_name: tripforge-route
+    restart: unless-stopped
+    ports:
+      - "${ROUTE_PORT:-8084}:8084"
+    environment:
+      SERVER_PORT:  8084
+      DB_HOST:      postgres
+      DB_PORT:      5432
+      DB_NAME:      ${DB_NAME:-tripforge}
+      DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
+      DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
+      EUREKA_URL:   http://discovery-server:8761/eureka/
+      JPA_DDL_AUTO: validate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8084/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+  # ── Budget Service ──────────────────────────────────────────────────────────
+  budget-service:
+    build:
+      context: ./budget-service
+      dockerfile: Dockerfile
+    container_name: tripforge-budget
+    restart: unless-stopped
+    ports:
+      - "${BUDGET_PORT:-8085}:8085"
+    environment:
+      SERVER_PORT:  8085
+      DB_HOST:      postgres
+      DB_PORT:      5432
+      DB_NAME:      ${DB_NAME:-tripforge}
+      DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
+      DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
+      EUREKA_URL:   http://discovery-server:8761/eureka/
+      JPA_DDL_AUTO: validate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8085/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+  # ── Split Service ───────────────────────────────────────────────────────────
+  split-service:
+    build:
+      context: ./split-service
+      dockerfile: Dockerfile
+    container_name: tripforge-split
+    restart: unless-stopped
+    ports:
+      - "${SPLIT_PORT:-8086}:8086"
+    environment:
+      SERVER_PORT:  8086
+      DB_HOST:      postgres
+      DB_PORT:      5432
+      DB_NAME:      ${DB_NAME:-tripforge}
+      DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
+      DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
+      EUREKA_URL:   http://discovery-server:8761/eureka/
+      JPA_DDL_AUTO: validate
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8086/actuator/health | grep -q UP || exit 1"]
+      interval: 20s
+      timeout: 10s
+      start_period: 120s
+      retries: 5
+
+  # ── ML Service (FastAPI) ────────────────────────────────────────────────────
+  # NOTE: saved_models/*.pkl must exist before building.
+  # Run training scripts locally first (see scripts/train-ml-models.sh)
+  ml-service:
+    build:
+      context: ./ml-service
+      dockerfile: Dockerfile
+    container_name: tripforge-ml
+    restart: unless-stopped
+    ports:
+      - "${ML_PORT:-8087}:8087"
+    environment:
+      DEBUG:       "false"
+      ML_WEIGHT:   "0.65"
+      RULE_WEIGHT: "0.35"
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8087/health')\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+  # ── Frontend (React → Nginx) ────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:8080
+    container_name: tripforge-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

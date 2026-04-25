@@ -1,0 +1,40 @@
+server:
+  port: ${SERVER_PORT:8085}
+
+spring:
+  application:
+    name: budget-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:tripforge}
+    username: ${DB_USERNAME:tripforge_user}
+    password: ${DB_PASSWORD:tripforge_pass}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: ${JPA_DDL_AUTO:validate}
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: budget
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    schemas: budget
+    baseline-on-migrate: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always

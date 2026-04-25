@@ -1,0 +1,45 @@
+server:
+  port: ${SERVER_PORT:8761}
+
+spring:
+  application:
+    name: discovery-server
+
+eureka:
+  instance:
+    hostname: ${EUREKA_HOSTNAME:localhost}
+  client:
+    # This server does not register itself as a client
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    # Wait time before evicting instances that haven't sent heartbeats
+    eviction-interval-timer-in-ms: 10000
+    # Disable self-preservation in development (set to true in production)
+    enable-self-preservation: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+  info:
+    env:
+      enabled: true
+
+info:
+  app:
+    name: TripForge Discovery Server
+    version: 1.0.0
+    description: Eureka Service Registry for TripForge microservices
+
+logging:
+  level:
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN
+    com.tripforge.discovery: INFO

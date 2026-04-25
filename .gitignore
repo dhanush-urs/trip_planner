@@ -1,0 +1,67 @@
+# =============================================================================
+# TripForge — .gitignore
+# =============================================================================
+
+# ── Environment files (contain secrets) ──────────────────────────────────────
+.env
+frontend/.env
+**/.env.local
+
+# ── Java / Maven ──────────────────────────────────────────────────────────────
+**/target/
+**/.mvn/wrapper/maven-wrapper.jar
+**/mvnw
+**/mvnw.cmd
+**/*.class
+**/*.jar
+!**/test*.jar
+
+# ── Python ────────────────────────────────────────────────────────────────────
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/venv/
+**/.venv/
+**/*.egg-info/
+**/dist/
+**/build/
+**/.pytest_cache/
+
+# ── ML — generated files (reproducible from training scripts) ─────────────────
+# Commit saved_models/ IF you want models pre-built in the repo.
+# Omit if you want users to train locally (recommended for large files).
+# ml-service/saved_models/*.pkl
+# ml-service/training/datasets/hotel_training_data.csv
+# ml-service/training/datasets/trip_style_training_data.csv
+
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+**/node_modules/
+**/dist/
+**/.vite/
+frontend/dist/
+
+# ── Docker ────────────────────────────────────────────────────────────────────
+# Do NOT ignore docker-compose.yml or Dockerfiles
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.iws
+*.ipr
+.DS_Store
+Thumbs.db
+
+# ── Logs ──────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db

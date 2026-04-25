@@ -1,0 +1,46 @@
+destination,name,price_per_night,rating,distance_from_center_km,amenities,category,popularity_score
+Goa,The Leela Goa,18000,4.8,2.1,pool,wifi,spa,restaurant,gym,beach_access,LUXURY,9.5
+Goa,Taj Exotica Resort Goa,22000,4.9,3.5,pool,wifi,spa,restaurant,gym,beach_access,LUXURY,9.7
+Goa,Novotel Goa Candolim,7500,4.2,1.8,pool,wifi,restaurant,gym,STANDARD,8.1
+Goa,Aloft North Goa,6800,4.1,2.0,pool,wifi,restaurant,bar,STANDARD,7.9
+Goa,Ibis Styles Goa Calangute,3200,3.8,2.5,wifi,restaurant,BUDGET,7.2
+Goa,OYO Townhouse Goa Beach,1800,3.5,3.0,wifi,parking,BUDGET,6.5
+Goa,Radisson Blu Resort Goa,9500,4.4,1.5,pool,wifi,spa,restaurant,gym,STANDARD,8.6
+Goa,Hyatt Centric Candolim,12000,4.6,1.2,pool,wifi,spa,restaurant,gym,LUXURY,9.1
+Goa,Zostel Goa,800,3.9,4.0,wifi,common_kitchen,BUDGET,7.8
+Goa,The Park Calangute,5500,4.0,2.2,pool,wifi,restaurant,STANDARD,7.5
+Mysore,Radisson Blu Plaza Hotel Mysore,7200,4.5,1.0,pool,wifi,spa,restaurant,gym,LUXURY,8.9
+Mysore,Royal Orchid Metropole,5500,4.3,0.8,pool,wifi,restaurant,gym,STANDARD,8.4
+Mysore,Hotel Pai Vista,2800,3.9,1.5,wifi,restaurant,parking,STANDARD,7.6
+Mysore,Treebo Trend Mysore,1500,3.7,2.0,wifi,parking,BUDGET,6.8
+Mysore,The Windflower Resort Mysore,9000,4.6,3.5,pool,wifi,spa,restaurant,LUXURY,9.0
+Mysore,Hotel Dasaprakash,1200,3.5,1.2,wifi,restaurant,BUDGET,6.2
+Mysore,Sandesh The Prince,4500,4.1,1.8,pool,wifi,restaurant,STANDARD,7.9
+Mysore,Lalitha Mahal Palace Hotel,11000,4.4,4.0,pool,wifi,spa,restaurant,gym,LUXURY,8.7
+Bangalore,The Oberoi Bangalore,18500,4.8,2.0,pool,wifi,spa,restaurant,gym,LUXURY,9.6
+Bangalore,ITC Windsor Bangalore,15000,4.7,1.5,pool,wifi,spa,restaurant,gym,LUXURY,9.4
+Bangalore,Taj MG Road Bangalore,12000,4.6,0.5,pool,wifi,spa,restaurant,gym,LUXURY,9.2
+Bangalore,Marriott Whitefield,9500,4.4,8.0,pool,wifi,restaurant,gym,STANDARD,8.5
+Bangalore,Lemon Tree Premier Ulsoor,5500,4.1,3.0,pool,wifi,restaurant,gym,STANDARD,8.0
+Bangalore,Ibis Bangalore City Centre,3800,3.9,1.0,wifi,restaurant,gym,STANDARD,7.7
+Bangalore,OYO Rooms Koramangala,1500,3.4,5.0,wifi,parking,BUDGET,6.3
+Bangalore,Zostel Bangalore,900,4.0,6.0,wifi,common_kitchen,BUDGET,7.5
+Bangalore,Treebo Trend Indiranagar,2200,3.8,4.5,wifi,parking,BUDGET,6.9
+Bangalore,The Ritz-Carlton Bangalore,22000,4.9,2.5,pool,wifi,spa,restaurant,gym,LUXURY,9.8
+Ooty,Savoy Hotel Ooty,8500,4.5,0.5,wifi,restaurant,fireplace,LUXURY,9.0
+Ooty,The Nilgiri Woodlands,5500,4.2,1.0,wifi,restaurant,garden,STANDARD,8.2
+Ooty,Hotel Lakeview,3200,3.9,1.5,wifi,restaurant,STANDARD,7.4
+Ooty,YMCA Ooty,1200,3.5,2.0,wifi,common_kitchen,BUDGET,6.5
+Ooty,Sterling Ooty Fern Hill,7000,4.3,3.0,pool,wifi,restaurant,gym,LUXURY,8.7
+Ooty,Sinclairs Retreat Ooty,4500,4.0,2.5,wifi,restaurant,garden,STANDARD,7.8
+Ooty,Hotel Darshan,1800,3.6,1.8,wifi,parking,BUDGET,6.2
+Ooty,The Monarch Ooty,6500,4.4,1.2,wifi,restaurant,spa,LUXURY,8.5
+Manali,The Himalayan,12000,4.7,1.0,wifi,restaurant,spa,fireplace,LUXURY,9.3
+Manali,Span Resort & Spa,9500,4.5,5.0,pool,wifi,spa,restaurant,LUXURY,9.0
+Manali,Snow Valley Resorts,6500,4.2,2.0,wifi,restaurant,fireplace,STANDARD,8.3
+Manali,Hotel Rohtang Regency,3500,3.9,1.5,wifi,restaurant,STANDARD,7.5
+Manali,Zostel Manali,900,4.1,3.0,wifi,common_kitchen,BUDGET,8.0
+Manali,OYO Rooms Old Manali,1500,3.5,3.5,wifi,parking,BUDGET,6.4
+Manali,Banjara Camps Manali,7500,4.4,4.0,wifi,restaurant,adventure_activities,STANDARD,8.8
+Manali,Solang Valley Resort,5500,4.1,8.0,wifi,restaurant,ski_access,STANDARD,8.1
+Manali,Apple Country Resort,4200,4.0,2.5,wifi,restaurant,garden,STANDARD,7.7
