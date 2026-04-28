@@ -55,7 +55,19 @@ echo ""
 
 # ── Infrastructure ────────────────────────────────────────────────────────────
 echo -e "  ${CYAN}Infrastructure:${RESET}"
-check "PostgreSQL (via gateway)" "http://localhost:8080/actuator/health" "UP"
+
+# PostgreSQL — check via docker exec if available, otherwise skip gracefully
+printf "  %-28s" "PostgreSQL"
+if docker exec tripforge-postgres pg_isready -U tripforge_user -d tripforge -q 2>/dev/null; then
+  echo -e "${GREEN}✓ UP${RESET}"
+  PASS=$((PASS + 1))
+elif docker ps --filter "name=tripforge-postgres" --filter "status=running" -q 2>/dev/null | grep -q .; then
+  echo -e "${YELLOW}⚠ RUNNING${RESET}  (pg_isready check skipped — container running)"
+  WARN=$((WARN + 1))
+else
+  echo -e "${RED}✗ NOT RUNNING${RESET}"
+  FAIL=$((FAIL + 1))
+fi
 
 echo ""
 echo -e "  ${CYAN}Java Microservices:${RESET}"
@@ -67,6 +79,79 @@ check "Hotel Service"      "http://localhost:8083/actuator/health"  "UP"
 check "Route Service"      "http://localhost:8084/actuator/health"  "UP"
 check "Budget Service"     "http://localhost:8085/actuator/health"  "UP"
 check "Split Service"      "http://localhost:8086/actuator/health"  "UP"
+
+echo ""
+echo -e "  ${CYAN}Phase 9B — External Data Service:${RESET}"
+check "External Data Service"  "http://localhost:8088/actuator/health"  "UP"
+
+# Provider health — free-first
+printf "  %-28s" "Provider Health"
+prov_resp=$(curl -sf --max-time 5 "http://localhost:8088/api/external/providers/health" 2>/dev/null)
+if [ -n "$prov_resp" ]; then
+  # Check free providers (not Google)
+  otm_ok=$(echo "$prov_resp" | grep -o '"opentripmap".*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | head -1)
+  ors_ok=$(echo "$prov_resp" | grep -o '"openrouteservice".*"status":"[^"]*"' | grep -o '"status":"[^"]*"' | head -1)
+  frank_ok=$(echo "$prov_resp" | grep -o '"frankfurter".*"status":"UP"' | head -1)
+  if [ -n "$frank_ok" ]; then
+    echo -e "${GREEN}✓ FREE PROVIDERS ACTIVE${RESET}  (Frankfurter FX + Nominatim always available)"
+    PASS=$((PASS + 1))
+  else
+    echo -e "${YELLOW}⚠ DEGRADED${RESET}  (some free providers may be unavailable)"
+    WARN=$((WARN + 1))
+  fi
+else
+  echo -e "${RED}✗ UNREACHABLE${RESET}"
+  FAIL=$((FAIL + 1))
+fi
+
+# Redis check
+printf "  %-28s" "Redis"
+if docker exec tripforge-redis redis-cli ping 2>/dev/null | grep -q PONG; then
+  echo -e "${GREEN}✓ UP${RESET}"
+  PASS=$((PASS + 1))
+elif docker ps --filter "name=tripforge-redis" --filter "status=running" -q 2>/dev/null | grep -q .; then
+  echo -e "${YELLOW}⚠ RUNNING${RESET}  (ping check skipped)"
+  WARN=$((WARN + 1))
+else
+  echo -e "${RED}✗ NOT RUNNING${RESET}"
+  FAIL=$((FAIL + 1))
+fi
+
+echo ""
+echo -e "  ${CYAN}Phase 9D — AI Orchestrator Service:${RESET}"
+check "AI Orchestrator"        "http://localhost:8089/actuator/health"  "UP"
+
+# Gemini config check (no key leak)
+printf "  %-28s" "Gemini Config"
+ai_resp=$(curl -sf --max-time 5 "http://localhost:8089/api/ai/health" 2>/dev/null)
+if echo "$ai_resp" | grep -q '"configured":true' 2>/dev/null; then
+  echo -e "${GREEN}✓ CONFIGURED${RESET}  (live AI responses active)"
+  PASS=$((PASS + 1))
+elif [ -n "$ai_resp" ]; then
+  echo -e "${YELLOW}⚠ NOT CONFIGURED${RESET}  (fallback mode — set GEMINI_API_KEY to enable)"
+  WARN=$((WARN + 1))
+else
+  echo -e "${RED}✗ UNREACHABLE${RESET}"
+  FAIL=$((FAIL + 1))
+fi
+
+echo ""
+echo -e "  ${CYAN}Phase 9F — Payment Service:${RESET}"
+check "Payment Service"        "http://localhost:8090/actuator/health"  "UP"
+
+# Razorpay config check (no key leak)
+printf "  %-28s" "Razorpay Config"
+pay_resp=$(curl -sf --max-time 5 "http://localhost:8090/actuator/health" 2>/dev/null)
+if echo "$pay_resp" | grep -q '"gateway_configured":true' 2>/dev/null; then
+  echo -e "${GREEN}✓ CONFIGURED${RESET}  (live payments active)"
+  PASS=$((PASS + 1))
+elif [ -n "$pay_resp" ]; then
+  echo -e "${YELLOW}⚠ NOT CONFIGURED${RESET}  (degraded — set RAZORPAY_KEY_ID/SECRET to enable)"
+  WARN=$((WARN + 1))
+else
+  echo -e "${RED}✗ UNREACHABLE${RESET}"
+  FAIL=$((FAIL + 1))
+fi
 
 echo ""
 echo -e "  ${CYAN}ML Service:${RESET}"

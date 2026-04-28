@@ -4,6 +4,49 @@ import { storage } from '../utils/storage.js';
 
 export const AuthContext = createContext(null);
 
+/**
+ * Maps an axios error to a user-friendly message.
+ * Never shows raw HTTP status text or internal hostnames.
+ *
+ * Priority:
+ *   1. Backend ApiResponse.message (most specific)
+ *   2. HTTP status code → friendly string
+ *   3. Network/timeout error → friendly string
+ *   4. Fallback default
+ */
+function resolveErrorMessage(err, fallback) {
+  const status = err.response?.status;
+  const body   = err.response?.data;
+
+  // 1. Backend sent a structured message — use it
+  if (body?.message && typeof body.message === 'string' && body.message.trim()) {
+    return body.message;
+  }
+
+  // 2. Map HTTP status to friendly text
+  if (status === 400) return body?.message || 'Invalid request. Please check your input.';
+  if (status === 401) return 'Invalid email or password.';
+  if (status === 403) return 'Access denied.';
+  if (status === 404) return 'Service not found. Please try again later.';
+  if (status === 409) return body?.message || 'An account with this email already exists.';
+  if (status === 429) return 'Too many attempts. Please wait a moment and try again.';
+  if (status === 500) return 'Server error. Please try again in a moment.';
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Backend temporarily unavailable. Please wait and try again.';
+  }
+
+  // 3. Network / timeout errors (no response at all)
+  if (!err.response) {
+    if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+      return 'Request timed out. Check that the backend is running.';
+    }
+    return 'Network error — cannot reach the server. Check that Docker is running.';
+  }
+
+  // 4. Fallback
+  return fallback;
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(storage.getUser());
   const [token, setToken]     = useState(storage.getToken());
@@ -42,14 +85,7 @@ export function AuthProvider({ children }) {
       });
       return { success: true };
     } catch (err) {
-      // err.response.data is the raw ApiResponse envelope from the backend
-      const body = err.response?.data;
-      const message =
-        body?.message ||          // ApiResponse.message (preferred — human-readable)
-        body?.error ||            // ApiResponse.error (error code fallback)
-        err.message ||            // Axios/network error
-        'Login failed. Please check your credentials.';
-      return { success: false, message };
+      return { success: false, message: resolveErrorMessage(err, 'Login failed. Please check your credentials.') };
     } finally {
       setLoading(false);
     }
@@ -76,14 +112,7 @@ export function AuthProvider({ children }) {
       });
       return { success: true };
     } catch (err) {
-      // err.response.data is the raw ApiResponse envelope from the backend
-      const body = err.response?.data;
-      const message =
-        body?.message ||          // ApiResponse.message (preferred — human-readable)
-        body?.error ||            // ApiResponse.error (error code fallback)
-        err.message ||            // Axios/network error
-        'Registration failed. Please try again.';
-      return { success: false, message };
+      return { success: false, message: resolveErrorMessage(err, 'Registration failed. Please try again.') };
     } finally {
       setLoading(false);
     }

@@ -34,6 +34,16 @@ public class SplitDetail {
     @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal perPersonAmount;
 
+    /** Phase 9E: currency code for this split */
+    @Column(length = 10)
+    @Builder.Default
+    private String currencyCode = "INR";
+
+    /** Phase 9F: split mode — EQUAL / CUSTOM_PERCENTAGE / CUSTOM_AMOUNT */
+    @Column(length = 30)
+    @Builder.Default
+    private String splitMode = "EQUAL";
+
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "split_participants",
             schema = "split_schema",

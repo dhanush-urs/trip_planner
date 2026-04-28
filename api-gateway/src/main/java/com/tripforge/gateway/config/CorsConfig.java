@@ -22,11 +22,14 @@ public class CorsConfig {
     public CorsWebFilter corsWebFilter() {
         CorsConfiguration corsConfig = new CorsConfiguration();
 
-        // Allowed origins — React Vite dev server + production URL
+        // Allowed origins — React Vite dev server + Docker nginx frontend
+        // The browser's Origin header reflects the HOST port, not the container port.
+        // Frontend container maps 3000:80, so browser sends Origin: http://localhost:3000
         corsConfig.setAllowedOrigins(List.of(
-                "http://localhost:5173",   // Vite dev server
-                "http://localhost:3000",   // Alternative dev port
-                "http://localhost:80"      // Production nginx
+                "http://localhost:5173",   // Vite dev server (npm run dev)
+                "http://localhost:3000",   // Docker nginx (host port 3000 → container port 80)
+                "http://localhost:80",     // Direct nginx access on port 80
+                "http://localhost"         // Bare localhost (no port)
         ));
 
         // Allowed HTTP methods

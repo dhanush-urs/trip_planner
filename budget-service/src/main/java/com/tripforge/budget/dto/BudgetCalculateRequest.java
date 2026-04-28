@@ -15,4 +15,6 @@ public class BudgetCalculateRequest {
     private BigDecimal hotelPricePerNight;
     private String hotelCategory;
     private List<Map<String, Object>> itinerary;
+    // Phase 9E
+    private String currencyCode;
 }

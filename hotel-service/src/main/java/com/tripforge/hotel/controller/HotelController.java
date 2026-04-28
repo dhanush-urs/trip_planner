@@ -26,9 +26,12 @@ public class HotelController {
             @RequestParam BigDecimal budget,
             @RequestParam Integer durationDays,
             @RequestParam Integer travelers,
-            @RequestParam(defaultValue = "STANDARD") String hotelPreference) {
+            @RequestParam(defaultValue = "STANDARD") String hotelPreference,
+            @RequestParam(required = false) Double lat,
+            @RequestParam(required = false) Double lng,
+            @RequestParam(defaultValue = "INR") String currency) {
         List<HotelDto> hotels = hotelService.recommendHotels(
-                destination, budget, durationDays, travelers, hotelPreference);
+                destination, lat, lng, budget, durationDays, travelers, hotelPreference, currency);
         return ResponseEntity.ok(ApiResponse.success(hotels));
     }
 

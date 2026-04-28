@@ -29,14 +29,19 @@ public class GatewayRoutesConfig {
                 // ── Auth Service ──────────────────────────────────────────────
                 // Public: /api/auth/register, /api/auth/login
                 // Protected: /api/users/**
+                //
+                // Uses static Docker DNS (http://auth-service:8081) instead of
+                // lb://auth-service to avoid Eureka startup race conditions.
+                // Auth is the most critical path — it must work immediately on boot.
+                // All other services use lb:// (Eureka) for load-balanced discovery.
                 .route("auth-service-public", r -> r
                         .path("/api/auth/**")
-                        .uri("lb://auth-service"))
+                        .uri("http://auth-service:8081"))
 
                 .route("auth-service-users", r -> r
                         .path("/api/users/**")
                         .filters(f -> f.filter(jwtAuthFilter.apply(new JwtAuthFilter.Config())))
-                        .uri("lb://auth-service"))
+                        .uri("http://auth-service:8081"))
 
                 // ── Trip Service ──────────────────────────────────────────────
                 .route("trip-service", r -> r
@@ -75,6 +80,43 @@ public class GatewayRoutesConfig {
                         .path("/api/ml/**")
                         .filters(f -> f.filter(jwtAuthFilter.apply(new JwtAuthFilter.Config())))
                         .uri("http://ml-service:8087"))
+
+                // ── External Data Service (Phase 9B) ─────────────────────────
+                // Internal service — called by hotel-service, route-service, trip-service
+                // Exposed via gateway for admin/testing and future frontend use.
+                // Location search (/api/external/locations/**) is PUBLIC — used by the
+                // destination autocomplete on the Plan Trip page (pre-trip, may be unauthenticated).
+                .route("external-data-locations-public", r -> r
+                        .path("/api/external/locations/**")
+                        .uri("lb://external-data-service"))
+
+                .route("external-data-service", r -> r
+                        .path("/api/external/**")
+                        .filters(f -> f.filter(jwtAuthFilter.apply(new JwtAuthFilter.Config())))
+                        .uri("lb://external-data-service"))
+
+                // ── AI Orchestrator Service (Phase 9D) ────────────────────────
+                // Gemini-powered AI enrichment — hotel/itinerary explanations, preference parsing
+                // Public parse-preferences endpoint; all others require JWT
+                .route("ai-orchestrator-public", r -> r
+                        .path("/api/ai/health")
+                        .uri("lb://ai-orchestrator-service"))
+
+                .route("ai-orchestrator-service", r -> r
+                        .path("/api/ai/**")
+                        .filters(f -> f.filter(jwtAuthFilter.apply(new JwtAuthFilter.Config())))
+                        .uri("lb://ai-orchestrator-service"))
+
+                // ── Payment Service (Phase 9F) ────────────────────────────────
+                // Webhook is public (signature-verified); all other payment endpoints require JWT
+                .route("payment-webhook", r -> r
+                        .path("/api/payments/webhook")
+                        .uri("lb://payment-service"))
+
+                .route("payment-service", r -> r
+                        .path("/api/payments/**")
+                        .filters(f -> f.filter(jwtAuthFilter.apply(new JwtAuthFilter.Config())))
+                        .uri("lb://payment-service"))
 
                 // ── Actuator (health checks — public) ─────────────────────────
                 .route("gateway-actuator", r -> r

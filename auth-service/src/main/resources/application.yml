@@ -16,6 +16,7 @@ spring:
       connection-timeout: 30000
       idle-timeout: 600000
       max-lifetime: 1800000
+      connection-init-sql: "CREATE SCHEMA IF NOT EXISTS auth"
 
   jpa:
     hibernate:
@@ -28,12 +29,9 @@ spring:
         default_schema: auth
     open-in-view: false
 
-  # Flyway for DB migrations
+  # Flyway disabled for local Docker — schema managed by Hibernate ddl-auto
   flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: false
-    init-sqls: CREATE SCHEMA IF NOT EXISTS auth
+    enabled: false
 
 # Eureka client
 eureka:

@@ -35,6 +35,8 @@ networks:
 volumes:
   postgres-data:
     name: tripforge-postgres-data
+  redis-data:
+    name: tripforge-redis-data
 
 # =============================================================================
 # SERVICES
@@ -62,6 +64,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+
+  # ── Redis (caching for external-data-service) ──────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: tripforge-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # ── Discovery Server (Eureka) ───────────────────────────────────────────────
   discovery-server:
@@ -130,7 +151,6 @@ services:
       EUREKA_URL:         http://discovery-server:8761/eureka/
       JWT_SECRET:         ${JWT_SECRET:-TripForge-Super-Secret-Key-2024-Must-Be-At-Least-256-Bits-Long!!}
       JWT_EXPIRATION_MS:  ${JWT_EXPIRATION_MS:-86400000}
-      JPA_DDL_AUTO:       update
     depends_on:
       postgres:
         condition: service_healthy
@@ -162,7 +182,6 @@ services:
       DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
       DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:   http://discovery-server:8761/eureka/
-      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy
@@ -195,7 +214,6 @@ services:
       DB_PASSWORD:      ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:       http://discovery-server:8761/eureka/
       ML_SERVICE_URL:   http://ml-service:8087
-      JPA_DDL_AUTO:     update
     depends_on:
       postgres:
         condition: service_healthy
@@ -227,7 +245,6 @@ services:
       DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
       DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:   http://discovery-server:8761/eureka/
-      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy
@@ -259,7 +276,6 @@ services:
       DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
       DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:   http://discovery-server:8761/eureka/
-      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy
@@ -291,7 +307,6 @@ services:
       DB_USERNAME:  ${DB_USERNAME:-tripforge_user}
       DB_PASSWORD:  ${DB_PASSWORD:-tripforge_pass}
       EUREKA_URL:   http://discovery-server:8761/eureka/
-      JPA_DDL_AUTO: update
     depends_on:
       postgres:
         condition: service_healthy
@@ -336,7 +351,10 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        VITE_API_BASE_URL: http://localhost:8080
+        # Empty string = use relative /api/* paths proxied by nginx to api-gateway:8080
+        # This is correct for Docker: browser never needs to know internal hostnames.
+        # For local `npm run dev`, set VITE_API_BASE_URL=http://localhost:8080 in frontend/.env
+        VITE_API_BASE_URL: ""
     container_name: tripforge-frontend
     restart: unless-stopped
     ports:
@@ -348,4 +366,110 @@ services:
       interval: 15s
       timeout: 5s
       start_period: 30s
+      retries: 12
+
+  # ── External Data Service (Phase 9B) ───────────────────────────────────────
+  external-data-service:
+    build:
+      context: ./external-data-service
+      dockerfile: Dockerfile
+    container_name: tripforge-external-data
+    restart: unless-stopped
+    ports:
+      - "${EXTERNAL_DATA_PORT:-8088}:8088"
+    environment:
+      SERVER_PORT:                  8088
+      EUREKA_URL:                   http://discovery-server:8761/eureka/
+      REDIS_HOST:                   redis
+      REDIS_PORT:                   6379
+      # ── Real data providers ───────────────────────────────────────────────
+      GEOAPIFY_API_KEY:             ${GEOAPIFY_API_KEY:-}
+      GEOAPIFY_ENABLED:             ${GEOAPIFY_ENABLED:-true}
+      OPENTRIPMAP_API_KEY:          ${OPENTRIPMAP_API_KEY:-}
+      OPENTRIPMAP_ENABLED:          ${OPENTRIPMAP_ENABLED:-true}
+      OPENROUTESERVICE_API_KEY:     ${OPENROUTESERVICE_API_KEY:-}
+      OPENROUTESERVICE_ENABLED:     ${OPENROUTESERVICE_ENABLED:-true}
+      FOURSQUARE_API_KEY:           ${FOURSQUARE_API_KEY:-}
+      FOURSQUARE_ENABLED:           ${FOURSQUARE_ENABLED:-true}
+      FRANKFURTER_ENABLED:          ${FRANKFURTER_ENABLED:-true}
+      # ── Optional Google APIs (disabled by default) ────────────────────────
+      GOOGLE_PLACES_API_KEY:        ${GOOGLE_PLACES_API_KEY:-}
+      GOOGLE_DIRECTIONS_API_KEY:    ${GOOGLE_DIRECTIONS_API_KEY:-}
+      GOOGLE_PLACES_ENABLED:        ${GOOGLE_PLACES_ENABLED:-false}
+      GOOGLE_DIRECTIONS_ENABLED:    ${GOOGLE_DIRECTIONS_ENABLED:-false}
+    depends_on:
+      redis:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8088/actuator/health | grep -q '\"status\":\"UP\"\\|\"status\":\"DEGRADED\"' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      start_period: 90s
+      retries: 12
+
+  # ── AI Orchestrator Service (Phase 9D) ─────────────────────────────────────
+  ai-orchestrator-service:
+    build:
+      context: ./ai-orchestrator-service
+      dockerfile: Dockerfile
+    container_name: tripforge-ai-orchestrator
+    restart: unless-stopped
+    ports:
+      - "${AI_ORCHESTRATOR_PORT:-8089}:8089"
+    environment:
+      SERVER_PORT:          8089
+      EUREKA_URL:           http://discovery-server:8761/eureka/
+      GEMINI_API_KEY:       ${GEMINI_API_KEY:-}
+      GEMINI_MODEL:         ${GEMINI_MODEL:-gemini-1.5-flash}
+      GEMINI_ENABLED:       ${GEMINI_ENABLED:-true}
+      GEMINI_TIMEOUT_MS:    ${GEMINI_TIMEOUT_MS:-5000}
+    depends_on:
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8089/actuator/health | grep -q '\"status\":\"UP\"\\|\"status\":\"DEGRADED\"' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      start_period: 90s
+      retries: 12
+
+  # ── Payment Service (Phase 9F) ──────────────────────────────────────────────
+  payment-service:
+    build:
+      context: ./payment-service
+      dockerfile: Dockerfile
+    container_name: tripforge-payment
+    restart: unless-stopped
+    ports:
+      - "${PAYMENT_SERVICE_PORT:-8090}:8090"
+    environment:
+      SERVER_PORT:              8090
+      DB_HOST:                  postgres
+      DB_PORT:                  5432
+      DB_NAME:                  ${DB_NAME:-tripforge}
+      DB_USERNAME:              ${DB_USERNAME:-tripforge_user}
+      DB_PASSWORD:              ${DB_PASSWORD:-tripforge_pass}
+      EUREKA_URL:               http://discovery-server:8761/eureka/
+      RAZORPAY_KEY_ID:          ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET:      ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_WEBHOOK_SECRET:  ${RAZORPAY_WEBHOOK_SECRET:-}
+      PAYMENTS_ENABLED:         ${PAYMENTS_ENABLED:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      discovery-server:
+        condition: service_healthy
+    networks:
+      - tripforge-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8090/actuator/health | grep -q '\"status\":\"UP\"\\|\"status\":\"DEGRADED\"' || exit 1"]
+      interval: 15s
+      timeout: 10s
+      start_period: 90s
       retries: 12

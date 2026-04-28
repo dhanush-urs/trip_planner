@@ -50,15 +50,32 @@ public class DataLoaderConfig {
                     String[] parts = line.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
                     if (parts.length < 8) continue;
 
+                    // CSV format: destination, name, price, rating, distance, amenity1[,amenity2,...], category, popularity
+                    // amenities are unquoted and variable-count — parse from both ends
+                    String destination   = parts[0].trim();
+                    String name          = parts[1].trim();
+                    double price         = Double.parseDouble(parts[2].trim());
+                    double rating        = Double.parseDouble(parts[3].trim());
+                    double distance      = Double.parseDouble(parts[4].trim());
+                    // last field = popularity_score, second-to-last = category
+                    String popularityStr = parts[parts.length - 1].trim();
+                    String category      = parts[parts.length - 2].trim();
+                    // everything between index 5 and (length-3) inclusive = amenities
+                    StringBuilder amenitiesSb = new StringBuilder();
+                    for (int i = 5; i <= parts.length - 3; i++) {
+                        if (amenitiesSb.length() > 0) amenitiesSb.append(",");
+                        amenitiesSb.append(parts[i].trim());
+                    }
+
                     Hotel hotel = Hotel.builder()
-                            .destination(parts[0].trim())
-                            .name(parts[1].trim())
-                            .pricePerNight(Double.parseDouble(parts[2].trim()))
-                            .rating(Double.parseDouble(parts[3].trim()))
-                            .distanceFromCenterKm(Double.parseDouble(parts[4].trim()))
-                            .amenities(parts[5].trim())
-                            .category(parts[6].trim())
-                            .popularityScore(Double.parseDouble(parts[7].trim()))
+                            .destination(destination)
+                            .name(name)
+                            .pricePerNight(price)
+                            .rating(rating)
+                            .distanceFromCenterKm(distance)
+                            .amenities(amenitiesSb.toString())
+                            .category(category)
+                            .popularityScore(Double.parseDouble(popularityStr))
                             .build();
 
                     hotels.add(hotel);

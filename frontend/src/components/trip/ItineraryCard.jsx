@@ -1,90 +1,163 @@
 import React, { useState } from 'react';
-import { formatDate, formatCurrency } from '../../utils/formatters.js';
 
-const CATEGORY_ICONS = {
-  nature:    '🌿', temple: '🛕', beach: '🏖️', adventure: '🧗',
-  food:      '🍜', nightlife: '🌙', shopping: '🛍️',
-};
+/**
+ * Generate a natural travel day title from theme + day number.
+ * Used when the backend doesn't provide a title.
+ */
+function buildDayTitle(day) {
+  // Use theme if it's a real travel theme (not a placeholder)
+  if (day.theme && day.theme !== 'Exploration Day' && !day.theme.includes('Tactical')) {
+    return day.theme;
+  }
+  // Generate from day number
+  const num = day.dayNumber;
+  if (num === 1) return 'Arrival & First Impressions';
+  // Use places/activities to infer a title
+  const places = day.places || day.activities || [];
+  if (places.length > 0) {
+    const categories = [...new Set(places.map(p => p.category).filter(Boolean))];
+    if (categories.includes('beach')) return `Day ${num} · Beach & Coastal Exploration`;
+    if (categories.includes('food')) return `Day ${num} · Food & Local Flavours`;
+    if (categories.includes('temple') || categories.includes('culture')) return `Day ${num} · Culture & Heritage`;
+    if (categories.includes('shopping')) return `Day ${num} · Shopping & Markets`;
+    if (categories.includes('nature')) return `Day ${num} · Nature & Outdoors`;
+    if (categories.includes('nightlife')) return `Day ${num} · Nightlife & Entertainment`;
+    if (categories.includes('adventure')) return `Day ${num} · Adventure & Thrills`;
+    if (categories.includes('sightseeing')) return `Day ${num} · City Sightseeing`;
+    if (categories.includes('transit') || categories.includes('leisure')) return `Day ${num} · Leisure & Departure`;
+  }
+  return `Day ${num} · Exploration`;
+}
+
+/**
+ * Get a clean activity name from a place object.
+ * Backend sends places with .name, .notes, .visitTime, .category.
+ */
+function getActivityName(place) {
+  return place.name || place.activity || place.title || 'Local Activity';
+}
+
+/**
+ * Get a description for a place — use notes if available.
+ */
+function getActivityDescription(place) {
+  if (place.notes && !place.notes.startsWith('Avg visit:')) return place.notes;
+  const parts = [];
+  if (place.visitTime) parts.push(place.visitTime);
+  if (place.avgVisitHours) parts.push(`~${place.avgVisitHours}h`);
+  if (place.category) parts.push(place.category);
+  return parts.join(' · ') || null;
+}
+
+const TIME_LABELS = ['Morning', 'Afternoon', 'Evening', 'Night'];
+const TIME_COLORS = [
+  { dot: 'bg-amber-400',  text: 'text-amber-400',  line: 'from-amber-400/30' },
+  { dot: 'bg-brand-400',  text: 'text-brand-400',  line: 'from-brand-400/30' },
+  { dot: 'bg-violet-400', text: 'text-violet-400', line: 'from-violet-400/30' },
+  { dot: 'bg-zinc-400',   text: 'text-zinc-400',   line: 'from-zinc-400/30'  },
+];
 
 export default function ItineraryCard({ day }) {
   const [expanded, setExpanded] = useState(true);
+
   if (!day) return null;
 
+  // Backend sends places; support both field names for safety
+  const activities = day.places || day.activities || [];
+  const title = buildDayTitle(day);
+  const activityCount = activities.length;
+
   return (
-    <div className="card overflow-hidden animate-slide-up">
-      {/* Day header */}
+    <div className={`rounded-3xl border transition-all duration-300 overflow-hidden ${
+      expanded
+        ? 'bg-[#121214] border-zinc-800/80 shadow-xl'
+        : 'bg-zinc-900/30 border-zinc-800/60 hover:bg-zinc-900/50'
+    }`}>
+
+      {/* Header — always visible */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between p-5 hover:bg-navy-700/30
-                   transition-colors text-left"
+        className="w-full flex items-center justify-between p-7 hover:bg-white/[0.02] transition-colors text-left"
       >
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-brand-500/20 border border-brand-500/30
-                          flex items-center justify-center shrink-0">
-            <span className="text-brand-400 font-bold text-sm">D{day.dayNumber}</span>
+        <div className="flex items-center gap-5">
+          {/* Day number badge */}
+          <div className="w-14 h-14 rounded-2xl bg-zinc-950 border border-zinc-800 flex flex-col items-center justify-center shrink-0">
+            <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest leading-none mb-0.5">Day</span>
+            <span className="text-2xl font-black text-zinc-100 leading-none">{day.dayNumber}</span>
           </div>
-          <div>
-            <p className="font-semibold text-slate-100">{day.theme || 'Exploration Day'}</p>
-            <p className="text-xs text-slate-500">{formatDate(day.date)}</p>
+
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-bold text-zinc-100 leading-tight">
+              {title}
+            </h3>
+            <div className="flex items-center gap-3 text-xs text-zinc-500">
+              {day.date && (
+                <span>{new Date(day.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+              )}
+              {day.date && activityCount > 0 && <span className="text-zinc-700">·</span>}
+              {activityCount > 0 && (
+                <span>{activityCount} {activityCount === 1 ? 'activity' : 'activities'}</span>
+              )}
+              {/* Fallback badge */}
+              {day.fallbackUsed && (
+                <>
+                  <span className="text-zinc-700">·</span>
+                  <span className="text-amber-500/70">Smart defaults</span>
+                </>
+              )}
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">{day.places?.length || 0} places</span>
-          <span className="text-slate-500 text-sm">{expanded ? '▲' : '▼'}</span>
+
+        <div className={`w-9 h-9 rounded-full border border-zinc-800 flex items-center justify-center transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}>
+          <svg className="w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+          </svg>
         </div>
       </button>
 
-      {/* Places */}
-      {expanded && day.places?.length > 0 && (
-        <div className="border-t border-navy-700 divide-y divide-navy-700/50">
-          {day.places.map((place, idx) => (
-            <div key={idx} className="flex items-start gap-4 px-5 py-4 hover:bg-navy-700/20
-                                      transition-colors">
-              {/* Time indicator */}
-              <div className="shrink-0 text-center w-16">
-                <p className="text-xs font-medium text-brand-400">{place.visitTime || '—'}</p>
-                <p className="text-xs text-slate-600 mt-0.5">
-                  {place.avgVisitHours ? `${place.avgVisitHours}h` : ''}
-                </p>
-              </div>
+      {/* Expanded activities */}
+      {expanded && (
+        <div className="px-7 pb-8">
+          {activityCount > 0 ? (
+            <div className="relative pl-10 space-y-8 before:absolute before:left-[7px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gradient-to-b before:from-brand-500/30 before:via-zinc-800 before:to-zinc-900 before:rounded-full">
+              {activities.map((activity, idx) => {
+                const colors = TIME_COLORS[idx % TIME_COLORS.length];
+                const timeLabel = TIME_LABELS[idx] || `Stop ${idx + 1}`;
+                const name = getActivityName(activity);
+                const description = getActivityDescription(activity);
 
-              {/* Connector line */}
-              <div className="flex flex-col items-center shrink-0 mt-1">
-                <div className="w-2.5 h-2.5 rounded-full bg-brand-500/60 border border-brand-400" />
-                {idx < day.places.length - 1 && (
-                  <div className="w-px flex-1 bg-navy-600 mt-1 min-h-[24px]" />
-                )}
-              </div>
+                return (
+                  <div key={idx} className="relative">
+                    {/* Timeline dot */}
+                    <div className={`absolute -left-[37px] top-1.5 w-3 h-3 rounded-full border-2 border-[#121214] z-10 ${colors.dot}`}></div>
 
-              {/* Place info */}
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-slate-200 text-sm">
-                      {CATEGORY_ICONS[place.category?.toLowerCase()] || '📍'} {place.name}
-                    </p>
-                    {place.category && (
-                      <p className="text-xs text-slate-500 capitalize mt-0.5">{place.category}</p>
-                    )}
-                    {place.notes && (
-                      <p className="text-xs text-slate-600 mt-1">{place.notes}</p>
-                    )}
+                    <div className="space-y-2">
+                      <p className={`text-[10px] font-bold uppercase tracking-widest ${colors.text}`}>
+                        {timeLabel}
+                        {activity.visitTime ? ` · ${activity.visitTime}` : ''}
+                      </p>
+                      <h4 className="text-base font-semibold text-zinc-100 leading-snug">{name}</h4>
+                      {description && (
+                        <p className="text-xs text-zinc-500 leading-relaxed">{description}</p>
+                      )}
+                      {/* Ticket cost if non-zero */}
+                      {activity.ticketCost > 0 && (
+                        <p className="text-xs text-zinc-600">
+                          Entry: {activity.ticketCost}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  {place.ticketCost > 0 && (
-                    <span className="text-xs text-slate-400 shrink-0">
-                      {formatCurrency(place.ticketCost)}
-                    </span>
-                  )}
-                </div>
-              </div>
+                );
+              })}
             </div>
-          ))}
-        </div>
-      )}
-
-      {expanded && (!day.places || day.places.length === 0) && (
-        <div className="px-5 py-6 text-center text-sm text-slate-500 border-t border-navy-700">
-          No attractions planned for this day.
+          ) : (
+            /* No activities — show a helpful message, not an empty shell */
+            <div className="py-6 text-center">
+              <p className="text-sm text-zinc-500">Activities for this day will be shown here.</p>
+            </div>
+          )}
         </div>
       )}
     </div>

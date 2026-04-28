@@ -6,7 +6,8 @@
 .PHONY: help up down logs ps rebuild reset health train verify \
         up-infra up-backend up-frontend run-auth run-ml run-frontend \
         logs-auth logs-gateway logs-trip logs-hotel logs-route \
-        logs-budget logs-split logs-ml logs-frontend logs-discovery
+        logs-budget logs-split logs-ml logs-frontend logs-discovery \
+        logs-external logs-redis logs-ai logs-payment
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 CYAN  := \033[0;36m
@@ -63,17 +64,7 @@ up:
 	@echo "  Run $(CYAN)make health$(RESET) after ~2 minutes to verify all services are UP."
 	@echo ""
 	@echo "  $(CYAN)Access Points (available once healthy):$(RESET)"
-	@echo "  Frontend App     →  http://localhost:3000"
-	@echo "  API Gateway      →  http://localhost:8080"
-	@echo "  Eureka Dashboard →  http://localhost:8761"
-	@echo "  ML Service Docs  →  http://localhost:8087/docs"
-	@echo ""
-	@echo "  $(CYAN)Useful Commands:$(RESET)"
-	@echo "  make health   — check all service health endpoints"
-	@echo "  make logs     — tail logs from all services"
-	@echo "  make ps       — show container status"
-	@echo "  make down     — stop the stack"
-	@echo ""
+	@echo "  Frontend App          →  http://localhost:3000"
 
 ## Stop and remove containers (keeps volumes)
 down:
@@ -158,6 +149,18 @@ logs-frontend:
 logs-discovery:
 	docker compose logs -f --tail=200 discovery-server
 
+logs-external:
+	docker compose logs -f --tail=200 external-data-service
+
+logs-redis:
+	docker compose logs -f --tail=100 redis
+
+logs-ai:
+	docker compose logs -f --tail=200 ai-orchestrator-service
+
+logs-payment:
+	docker compose logs -f --tail=200 payment-service
+
 ## Show container status
 ps:
 	@echo ""
@@ -191,9 +194,10 @@ up-infra:
 ## Start all backend services (no frontend)
 up-backend:
 	@echo "$(CYAN)  Starting backend services...$(RESET)"
-	docker compose up -d postgres discovery-server api-gateway \
+	docker compose up -d postgres redis discovery-server api-gateway \
 	  auth-service trip-service hotel-service route-service \
-	  budget-service split-service ml-service
+	  budget-service split-service ml-service external-data-service \
+	  ai-orchestrator-service payment-service
 	@echo "  $(GREEN)✓ Backend services started$(RESET)"
 
 ## Start frontend only

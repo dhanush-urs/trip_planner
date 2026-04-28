@@ -1,7 +1,9 @@
 package com.tripforge.budget.service;
 
+import com.tripforge.budget.client.FxServiceClient;
 import com.tripforge.budget.dto.BudgetBreakdownDto;
 import com.tripforge.budget.dto.BudgetCalculateRequest;
+import com.tripforge.budget.dto.FxRateResponse;
 import com.tripforge.budget.entity.BudgetBreakdown;
 import com.tripforge.budget.repository.BudgetBreakdownRepository;
 import org.slf4j.Logger;
@@ -12,74 +14,102 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Budget calculation service.
+ * Budget calculation service — Phase 9E upgrade.
  *
- * Cost estimation model (per trip):
- *   Hotel cost     = hotelPricePerNight × durationDays
- *   Food cost      = dailyFoodRate × travelers × durationDays
- *   Transport cost = dailyTransportRate × travelers × durationDays
- *   Attraction cost= sum of ticket costs from itinerary × travelers
- *   Misc cost      = 5% of (hotel + food + transport + attraction)
- *
- * Daily food rates by destination tier:
- *   Metro (Bangalore): ₹800/person/day
- *   Tourist (Goa, Manali): ₹600/person/day
- *   Budget (Mysore, Ooty): ₹400/person/day
+ * Strategy:
+ *   1. All base rates (food, transport) are defined in INR
+ *   2. Hotel price arrives in the currency it was sourced in
+ *      (INR for CSV hotels, provider currency for live hotels)
+ *   3. If selected currency != INR:
+ *      - convert all INR-based costs via external-data-service FX
+ *      - if FX unavailable: return INR amounts with fxFallbackUsed=true + warning
+ *   4. All output amounts are in the selected currency
+ *   5. exchangeRateUsed is stored for auditability
  */
 @Service
 public class BudgetService {
 
     private static final Logger log = LoggerFactory.getLogger(BudgetService.class);
+    private static final String BASE_CURRENCY = "INR";
 
-    @Autowired
-    private BudgetBreakdownRepository breakdownRepository;
+    @Autowired private BudgetBreakdownRepository breakdownRepository;
+    @Autowired private FxServiceClient fxServiceClient;
 
     @Transactional
     public BudgetBreakdownDto calculate(Map<String, Object> requestMap) {
         BudgetCalculateRequest request = parseRequest(requestMap);
-        log.info("Calculating budget for trip {} | {} days | {} travelers",
-                request.getTripId(), request.getDurationDays(), request.getTravelers());
+        String targetCurrency = (request.getCurrencyCode() != null
+                && !request.getCurrencyCode().isBlank())
+                ? request.getCurrencyCode().toUpperCase() : BASE_CURRENCY;
+
+        log.info("Calculating budget for trip {} | {} days | {} travelers | currency={}",
+                request.getTripId(), request.getDurationDays(), request.getTravelers(), targetCurrency);
 
         int days = request.getDurationDays() != null ? request.getDurationDays() : 1;
         int travelers = request.getTravelers() != null ? request.getTravelers() : 1;
         String destination = request.getDestination() != null ? request.getDestination() : "";
 
-        // Hotel cost
-        BigDecimal hotelCost = BigDecimal.ZERO;
+        // ── Step 1: Compute all costs in INR (base currency) ─────────────────
+
+        // Hotel cost — hotel price may already be in target currency if from live provider
+        BigDecimal hotelCostInr = BigDecimal.ZERO;
         if (request.getHotelPricePerNight() != null) {
-            hotelCost = request.getHotelPricePerNight()
+            // If hotel price currency matches target, no conversion needed for hotel
+            // Otherwise treat as INR (CSV dataset prices are INR-based)
+            hotelCostInr = request.getHotelPricePerNight()
                     .multiply(BigDecimal.valueOf(days))
                     .setScale(2, RoundingMode.HALF_UP);
         }
 
-        // Food cost
-        double dailyFoodRate = getDailyFoodRate(destination);
-        BigDecimal foodCost = BigDecimal.valueOf(dailyFoodRate * travelers * days)
+        BigDecimal foodCostInr = BigDecimal.valueOf(getDailyFoodRate(destination) * travelers * days)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        // Transport cost
-        double dailyTransportRate = getDailyTransportRate(destination);
-        BigDecimal transportCost = BigDecimal.valueOf(dailyTransportRate * travelers * days)
+        BigDecimal transportCostInr = BigDecimal.valueOf(getDailyTransportRate(destination) * travelers * days)
                 .setScale(2, RoundingMode.HALF_UP);
 
-        // Attraction cost from itinerary
-        BigDecimal attractionCost = calculateAttractionCost(request.getItinerary(), travelers);
+        BigDecimal attractionCostInr = calculateAttractionCost(request.getItinerary(), travelers);
 
-        // Misc = 5% of subtotal
-        BigDecimal subtotal = hotelCost.add(foodCost).add(transportCost).add(attractionCost);
-        BigDecimal miscCost = subtotal.multiply(BigDecimal.valueOf(0.05))
+        BigDecimal subtotalInr = hotelCostInr.add(foodCostInr).add(transportCostInr).add(attractionCostInr);
+        BigDecimal miscCostInr = subtotalInr.multiply(BigDecimal.valueOf(0.05))
                 .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalInr = subtotalInr.add(miscCostInr).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal totalEstimated = subtotal.add(miscCost).setScale(2, RoundingMode.HALF_UP);
+        // ── Step 2: Convert to target currency if needed ──────────────────────
+        FxResult fx = convertToTargetCurrency(totalInr, targetCurrency);
+
+        BigDecimal conversionRate = fx.rate;
+        boolean fxFallback = fx.fallbackUsed;
+        String fxProvider = fx.provider;
+        List<String> warnings = new ArrayList<>();
+
+        if (fxFallback && !BASE_CURRENCY.equals(targetCurrency)) {
+            warnings.add("FX rate unavailable — amounts shown in " + BASE_CURRENCY
+                    + " (target: " + targetCurrency + ")");
+            // Fall back to INR display
+            targetCurrency = BASE_CURRENCY;
+            conversionRate = BigDecimal.ONE;
+        }
+
+        // Apply conversion rate to all line items
+        BigDecimal hotelCost     = applyRate(hotelCostInr, conversionRate);
+        BigDecimal foodCost      = applyRate(foodCostInr, conversionRate);
+        BigDecimal transportCost = applyRate(transportCostInr, conversionRate);
+        BigDecimal attractionCost= applyRate(attractionCostInr, conversionRate);
+        BigDecimal miscCost      = applyRate(miscCostInr, conversionRate);
+        BigDecimal totalEstimated= applyRate(totalInr, conversionRate);
+
+        // Total budget in target currency
         BigDecimal totalBudget = request.getTotalBudget() != null
                 ? request.getTotalBudget() : totalEstimated;
         boolean overBudget = totalEstimated.compareTo(totalBudget) > 0;
+        BigDecimal remaining = totalBudget.subtract(totalEstimated).setScale(2, RoundingMode.HALF_UP);
 
-        // Persist
+        // ── Step 3: Persist ───────────────────────────────────────────────────
         BudgetBreakdown breakdown = BudgetBreakdown.builder()
                 .tripId(request.getTripId())
                 .hotelCost(hotelCost)
@@ -90,14 +120,15 @@ public class BudgetService {
                 .totalEstimated(totalEstimated)
                 .totalBudget(totalBudget)
                 .overBudget(overBudget)
+                .currencyCode(targetCurrency)
+                .exchangeRateUsed(conversionRate.compareTo(BigDecimal.ONE) == 0 ? null : conversionRate)
+                .fxSourceProvider(fxProvider)
+                .fxFallbackUsed(fxFallback)
                 .build();
 
-        // Upsert
         breakdownRepository.findByTripId(request.getTripId())
                 .ifPresent(existing -> breakdown.setId(existing.getId()));
         breakdownRepository.save(breakdown);
-
-        BigDecimal remaining = totalBudget.subtract(totalEstimated).setScale(2, RoundingMode.HALF_UP);
 
         return BudgetBreakdownDto.builder()
                 .tripId(request.getTripId())
@@ -110,6 +141,11 @@ public class BudgetService {
                 .totalBudget(totalBudget)
                 .remainingBudget(remaining)
                 .overBudget(overBudget)
+                .currencyCode(targetCurrency)
+                .exchangeRateUsed(conversionRate.compareTo(BigDecimal.ONE) == 0 ? null : conversionRate)
+                .fxSourceProvider(fxProvider)
+                .fxFallbackUsed(fxFallback)
+                .warnings(warnings.isEmpty() ? null : warnings)
                 .build();
     }
 
@@ -126,17 +162,60 @@ public class BudgetService {
                         .totalBudget(b.getTotalBudget())
                         .remainingBudget(b.getTotalBudget().subtract(b.getTotalEstimated()))
                         .overBudget(b.isOverBudget())
+                        .currencyCode(b.getCurrencyCode() != null ? b.getCurrencyCode() : BASE_CURRENCY)
+                        .exchangeRateUsed(b.getExchangeRateUsed())
+                        .fxSourceProvider(b.getFxSourceProvider())
+                        .fxFallbackUsed(b.isFxFallbackUsed())
                         .build())
                 .orElseThrow(() -> new RuntimeException("Budget not found for trip: " + tripId));
     }
 
-    // ── Private helpers ───────────────────────────────────────────────────────
+    // ── FX conversion ─────────────────────────────────────────────────────────
+
+    private static class FxResult {
+        BigDecimal rate = BigDecimal.ONE;
+        boolean fallbackUsed = false;
+        String provider = "none";
+    }
+
+    private FxResult convertToTargetCurrency(BigDecimal amountInr, String targetCurrency) {
+        FxResult result = new FxResult();
+        if (BASE_CURRENCY.equals(targetCurrency)) return result;
+
+        try {
+            FxRateResponse response = fxServiceClient.getRate(BASE_CURRENCY, targetCurrency);
+            if (response != null && response.getData() != null
+                    && response.getData().getRate() != null) {
+                result.rate = response.getData().getRate();
+                result.fallbackUsed = response.isFallbackUsed() || response.getData().isFallbackRate();
+                result.provider = response.getSourceProvider() != null
+                        ? response.getSourceProvider() : "frankfurter";
+                log.info("FX rate {}/{} = {} (provider={}, fallback={})",
+                        BASE_CURRENCY, targetCurrency, result.rate, result.provider, result.fallbackUsed);
+            } else {
+                log.warn("FX response empty for {}/{} — using INR fallback", BASE_CURRENCY, targetCurrency);
+                result.fallbackUsed = true;
+            }
+        } catch (Exception e) {
+            log.warn("FX call failed for {}/{}: {} — using INR fallback",
+                    BASE_CURRENCY, targetCurrency, e.getMessage());
+            result.fallbackUsed = true;
+        }
+        return result;
+    }
+
+    private BigDecimal applyRate(BigDecimal amount, BigDecimal rate) {
+        if (rate == null || rate.compareTo(BigDecimal.ONE) == 0) return amount;
+        return amount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    // ── Base rate helpers (INR) ───────────────────────────────────────────────
 
     private double getDailyFoodRate(String destination) {
         return switch (destination.toLowerCase()) {
             case "bangalore" -> 800.0;
             case "goa", "manali" -> 600.0;
-            default -> 400.0; // Mysore, Ooty
+            default -> 400.0;
         };
     }
 
@@ -152,16 +231,13 @@ public class BudgetService {
     @SuppressWarnings("unchecked")
     private BigDecimal calculateAttractionCost(List<Map<String, Object>> itinerary, int travelers) {
         if (itinerary == null || itinerary.isEmpty()) return BigDecimal.ZERO;
-
         double total = 0.0;
         for (Map<String, Object> day : itinerary) {
             List<Map<String, Object>> places = (List<Map<String, Object>>) day.get("places");
             if (places == null) continue;
             for (Map<String, Object> place : places) {
                 Object cost = place.get("ticketCost");
-                if (cost != null) {
-                    total += ((Number) cost).doubleValue();
-                }
+                if (cost != null) total += ((Number) cost).doubleValue();
             }
         }
         return BigDecimal.valueOf(total * travelers).setScale(2, RoundingMode.HALF_UP);
@@ -180,6 +256,8 @@ public class BudgetService {
                 ? new BigDecimal(map.get("hotelPricePerNight").toString()) : null);
         req.setHotelCategory((String) map.get("hotelCategory"));
         req.setItinerary((List<Map<String, Object>>) map.get("itinerary"));
+        // Phase 9E: currency
+        req.setCurrencyCode((String) map.getOrDefault("currencyCode", "INR"));
         return req;
     }
 }

@@ -1,0 +1,145 @@
+server:
+  port: ${SERVER_PORT:8088}
+
+spring:
+  application:
+    name: external-data-service
+
+  # Jackson — enable Java 8 date/time serialization (required for LocalDate in FxRateDto)
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+
+  # Redis cache
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
+      connect-timeout: 2000ms
+
+  cache:
+    type: redis
+    redis:
+      time-to-live: 3600000   # default 1 hour; overridden per cache name below
+
+# Eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# ── External Provider Configuration ──────────────────────────────────────────
+# FREE-FIRST: OpenTripMap + OpenRouteService + Frankfurter are the primary providers.
+# Google APIs are OPTIONAL and disabled by default.
+# Set GOOGLE_PLACES_ENABLED=true and provide a key to enable Google as a fallback.
+providers:
+  google:
+    places:
+      api-key: ${GOOGLE_PLACES_API_KEY:}
+      base-url: https://maps.googleapis.com/maps/api
+      enabled: ${GOOGLE_PLACES_ENABLED:false}   # disabled by default — optional
+      timeout-ms: 5000
+    directions:
+      api-key: ${GOOGLE_DIRECTIONS_API_KEY:}
+      base-url: https://maps.googleapis.com/maps/api
+      enabled: ${GOOGLE_DIRECTIONS_ENABLED:false}  # disabled by default — optional
+      timeout-ms: 5000
+
+  opentripmap:
+    api-key: ${OPENTRIPMAP_API_KEY:}
+    base-url: https://api.opentripmap.com/0.1/en
+    enabled: ${OPENTRIPMAP_ENABLED:true}
+    timeout-ms: 5000
+
+  openrouteservice:
+    api-key: ${OPENROUTESERVICE_API_KEY:}
+    base-url: https://api.openrouteservice.org
+    enabled: ${OPENROUTESERVICE_ENABLED:true}
+    timeout-ms: 5000
+
+  frankfurter:
+    base-url: https://api.frankfurter.app
+    enabled: ${FRANKFURTER_ENABLED:true}
+    timeout-ms: 3000
+
+  # ── Geoapify (geocoding + places + routing) ───────────────────────────────
+  # Free tier: 3,000 req/day, no credit card required
+  # Get free key: https://www.geoapify.com/
+  # PRIMARY provider for destination search + hotel discovery
+  geoapify:
+    api-key: ${GEOAPIFY_API_KEY:}
+    base-url: https://api.geoapify.com
+    enabled: ${GEOAPIFY_ENABLED:true}
+    timeout-ms: 5000
+
+  # ── Foursquare Places API (optional — hotel/POI search) ──────────────────
+  # Free tier available: https://developer.foursquare.com/
+  # Optional secondary provider for hotel/POI discovery
+  foursquare:
+    api-key: ${FOURSQUARE_API_KEY:}
+    base-url: https://api.foursquare.com/v3
+    enabled: ${FOURSQUARE_ENABLED:true}
+    timeout-ms: 5000
+
+  # NOTE: Amadeus removed — requires OAuth2 + billing account.
+  # NOTE: Aviationstack is for flights only — not used here.
+
+# ── Cache TTL configuration (milliseconds) ───────────────────────────────────
+cache:
+  ttl:
+    places-search: 1800000      # 30 min
+    place-details: 3600000      # 1 hour
+    hotel-search: 1800000       # 30 min
+    route-optimize: 1800000     # 30 min
+    fx-rates: 21600000          # 6 hours
+    provider-health: 60000      # 1 min
+    location-search: 900000     # 15 min — short TTL for destination autocomplete
+
+# ── Resilience4j ─────────────────────────────────────────────────────────────
+resilience4j:
+  retry:
+    instances:
+      googlePlaces:
+        max-attempts: 2
+        wait-duration: 500ms
+      openTripMap:
+        max-attempts: 2
+        wait-duration: 500ms
+      googleDirections:
+        max-attempts: 2
+        wait-duration: 500ms
+      frankfurter:
+        max-attempts: 2
+        wait-duration: 300ms
+  circuitbreaker:
+    instances:
+      googlePlaces:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+      googleDirections:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.tripforge.external: DEBUG
+    org.springframework.web.client: WARN

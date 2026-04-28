@@ -1,5 +1,6 @@
 package com.tripforge.trip.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,6 +12,7 @@ import java.math.BigDecimal;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class TripPlaceDto {
     private Long attractionId;
     private String name;
@@ -20,4 +22,10 @@ public class TripPlaceDto {
     private BigDecimal ticketCost;
     private String notes;
     private Integer visitOrder;
+
+    // Phase 9C additions
+    private String externalPlaceId;
+    private Double lat;
+    private Double lng;
+    private Integer travelTimeFromPreviousMinutes;
 }

@@ -17,14 +17,16 @@ public class SplitResultDto {
     private BigDecimal totalAmount;
     private Integer travelers;
     private BigDecimal perPersonAmount;
-    private List<ParticipantSplitDto> participants;
+    private List<ParticipantDto> participants;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class ParticipantSplitDto {
+    public static class ParticipantDto {
+        private Long participantId;
         private String name;
+        private String email;
         private BigDecimal amount;
         private Double percentage;
     }

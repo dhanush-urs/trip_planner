@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth.js';
 import ProtectedLayout from '../components/layout/ProtectedLayout.jsx';
 import LoadingSpinner from '../components/common/LoadingSpinner.jsx';
+import PageErrorBoundary from '../components/common/PageErrorBoundary.jsx';
 
 import LoginPage      from '../pages/LoginPage.jsx';
 import RegisterPage   from '../pages/RegisterPage.jsx';
@@ -37,10 +38,10 @@ export default function AppRoutes() {
       <Route element={<RequireAuth><ProtectedLayout /></RequireAuth>}>
         <Route path="/dashboard"        element={<DashboardPage />} />
         <Route path="/trip/create"      element={<CreateTripPage />} />
-        <Route path="/trip/result"      element={<TripResultPage />} />
-        <Route path="/trip/result/:id"  element={<TripResultPage />} />
+        <Route path="/trip/result"      element={<PageErrorBoundary><TripResultPage /></PageErrorBoundary>} />
+        <Route path="/trip/result/:id"  element={<PageErrorBoundary><TripResultPage /></PageErrorBoundary>} />
         <Route path="/trip/history"     element={<TripHistoryPage />} />
-        <Route path="/trip/:id"         element={<TripDetailsPage />} />
+        <Route path="/trip/:id"         element={<PageErrorBoundary><TripDetailsPage /></PageErrorBoundary>} />
       </Route>
 
       {/* Fallback */}

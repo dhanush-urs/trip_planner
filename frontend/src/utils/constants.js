@@ -1,4 +1,11 @@
-export const DESTINATIONS = ['Goa', 'Mysore', 'Bangalore', 'Ooty', 'Manali'];
+export const CURRENCIES = [
+  { value: 'INR', label: '₹ INR — Indian Rupee',    symbol: '₹'   },
+  { value: 'USD', label: '$ USD — US Dollar',        symbol: '$'   },
+  { value: 'EUR', label: '€ EUR — Euro',             symbol: '€'   },
+  { value: 'GBP', label: '£ GBP — British Pound',   symbol: '£'   },
+  { value: 'AED', label: 'AED — UAE Dirham',         symbol: 'AED' },
+  { value: 'SGD', label: 'S$ SGD — Singapore Dollar',symbol: 'S$'  },
+];
 
 export const INTERESTS = [
   { value: 'nature',    label: '🌿 Nature'    },

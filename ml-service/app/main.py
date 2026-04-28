@@ -20,6 +20,7 @@ from app.api.health import router as health_router
 from app.api.routes import router as ml_router
 from app.config import settings
 from app.models.model_loader import model_loader
+from app.middleware.correlation import CorrelationIdMiddleware
 
 # ── Logging setup ─────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -63,6 +64,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Correlation ID middleware
+app.add_middleware(CorrelationIdMiddleware)
 
 # ── Register routers ──────────────────────────────────────────────────────────
 app.include_router(health_router)

@@ -1,0 +1,53 @@
+server:
+  port: ${SERVER_PORT:8090}
+
+spring:
+  application:
+    name: payment-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:tripforge}
+    username: ${DB_USERNAME:tripforge_user}
+    password: ${DB_PASSWORD:tripforge_pass}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      connection-init-sql: "CREATE SCHEMA IF NOT EXISTS payment"
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        default_schema: payment
+    open-in-view: false
+  # Flyway disabled for local Docker — schema managed by Hibernate ddl-auto
+  flyway:
+    enabled: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+  instance:
+    prefer-ip-address: true
+
+# ── Razorpay Configuration ────────────────────────────────────────────────────
+razorpay:
+  key-id:         ${RAZORPAY_KEY_ID:}
+  key-secret:     ${RAZORPAY_KEY_SECRET:}
+  webhook-secret: ${RAZORPAY_WEBHOOK_SECRET:}
+  enabled:        ${PAYMENTS_ENABLED:true}
+  base-url:       https://api.razorpay.com/v1
+  timeout-ms:     10000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.tripforge.payment: DEBUG

@@ -43,6 +43,21 @@ public class BudgetBreakdown {
     @Column(nullable = false)
     private boolean overBudget;
 
+    /** Phase 9E: currency fields */
+    @Column(length = 10)
+    @Builder.Default
+    private String currencyCode = "INR";
+
+    @Column(precision = 18, scale = 8)
+    private java.math.BigDecimal exchangeRateUsed;
+
+    @Column(length = 50)
+    private String fxSourceProvider;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean fxFallbackUsed = false;
+
     @CreationTimestamp
     private LocalDateTime calculatedAt;
 }

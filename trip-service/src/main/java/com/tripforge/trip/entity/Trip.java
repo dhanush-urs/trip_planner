@@ -69,6 +69,14 @@ public class Trip {
     @Column
     private Long selectedHotelId;
 
+    /**
+     * Currency code for this trip (e.g. INR, USD, EUR).
+     * Defaults to INR for backward compatibility.
+     */
+    @Column(length = 10)
+    @Builder.Default
+    private String currencyCode = "INR";
+
     @OneToMany(mappedBy = "trip", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @Builder.Default
     @OrderBy("dayNumber ASC")

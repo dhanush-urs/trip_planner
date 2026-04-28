@@ -1,0 +1,59 @@
+server:
+  port: ${SERVER_PORT:8089}
+
+spring:
+  application:
+    name: ai-orchestrator-service
+  # No database — this service is stateless
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+    fetch-registry: true
+    register-with-eureka: true
+  instance:
+    prefer-ip-address: true
+    instance-id: ${spring.application.name}:${server.port}
+
+# ── Gemini Configuration ──────────────────────────────────────────────────────
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  model: ${GEMINI_MODEL:gemini-1.5-flash}
+  enabled: ${GEMINI_ENABLED:true}
+  timeout-ms: ${GEMINI_TIMEOUT_MS:5000}
+  base-url: https://generativelanguage.googleapis.com/v1beta
+  max-retries: 2
+  temperature: 0.1
+
+# ── Resilience4j ──────────────────────────────────────────────────────────────
+resilience4j:
+  retry:
+    instances:
+      gemini:
+        max-attempts: 2
+        wait-duration: 500ms
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+  timelimiter:
+    instances:
+      gemini:
+        timeout-duration: 6s
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.tripforge.ai: DEBUG
